@@ -8,14 +8,13 @@ namespace GravityGuy.Env
     public class GameOverZone : MonoBehaviour
     {
         public UImanager manager;
-        private void OnCollisionEnter(Collision collision)
+        private void OnTriggerEnter(Collider other)
         {
-            if(collision.gameObject.GetComponent<PlayerView>() != null)
+            if (other.gameObject.GetComponent<PlayerView>() != null)
             {
                 Debug.Log("Game Over");
                 manager.GameOverUI();
             }
-            
         }
     }
 

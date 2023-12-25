@@ -91,27 +91,18 @@ namespace GravityGuy.Player
 
         private void changeGravity()
         {
-            if (setGroundGravity)
+            if (isGrounded)
             {
-                if (isGrounded)
+                if ((transform.up == Vector3.up && velocity.y < 0) || (transform.up == Vector3.down && velocity.y > 0) ||
+                    (transform.up == Vector3.forward && velocity.z < 0) || (transform.up == Vector3.forward && velocity.z > 0) ||
+                    (transform.up == Vector3.right && velocity.x < 0) || (transform.up == Vector3.left && velocity.x > 0))
                 {
-                    if ((transform.up == Vector3.up && velocity.y<0 )|| (transform.up == Vector3.down && velocity.y > 0)||
-                        (transform.up == Vector3.forward && velocity.z < 0)|| (transform.up == Vector3.forward && velocity.z > 0)||
-                        (transform.up == Vector3.right && velocity.x < 0)|| (transform.up == Vector3.left && velocity.x > 0))
-                    {
-                        Debug.Log(transform.up + "   " + Vector3.up);
-                        velocity = gravityDirection * -defaultGravity;
-                        setGroundGravity = false;
-                    }
-                    
+                    velocity = gravityDirection * defaultGravity;
+                    Debug.Log(transform.up + "   " + Vector3.up +"   " + velocity);
                 }
-                else
-                {
-                    velocity += gravityDirection * -gravity;
-                }
+
             }
-            if(!isGrounded ||velocity.magnitude>=10)
-                setGroundGravity = true;
+            velocity += gravityDirection * gravity * Time.deltaTime;
             playerController.Move(velocity * Time.deltaTime);
         }
 
@@ -137,14 +128,15 @@ namespace GravityGuy.Player
             if (Input.GetKey(KeyCode.S)) vertical = -1f;
             if (Input.GetKey(KeyCode.D)) horizontal = 1f;
             if (Input.GetKey(KeyCode.A)) horizontal = -1f;
-            if (Input.GetKeyDown(KeyCode.Space)) jump();
+            if (Input.GetKeyDown(KeyCode.Space) && isGrounded) jump();
         }
 
         private void jump()
         {
             Playeranimator.SetTrigger("OnAir");
-            float jumpforce = Mathf.Sqrt(jumpHeight * -2f * gravity);
-            Debug.Log(transform.up * jumpforce);
+            float jumpforcesq = jumpHeight * defaultGravity * gravity;
+            float jumpforce = Mathf.Sqrt(jumpforcesq);
+            Debug.Log(transform.up * jumpforce + "   " + jumpforcesq);
             velocity = transform.up * jumpforce;
             playerController.Move(velocity * Time.deltaTime);
         }
@@ -159,7 +151,6 @@ namespace GravityGuy.Player
             {
                 targetAngle = Mathf.Atan2(newpos.x, newpos.z) * Mathf.Rad2Deg + offsetangle;
                 angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSmoothVelocity, turnSmoothTime);
-                Debug.Log(transform.rotation.z);
                 if(currDirection == Direction.Left || currDirection==Direction.Right)
                 {
                     transform.rotation = Quaternion.Euler( angle,0f, transform.rotation.eulerAngles.z);
