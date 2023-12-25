@@ -1,5 +1,7 @@
 
 using Cinemachine;
+using Cinemachine.Utility;
+using GravityGuy.CameraFollow;
 using UnityEngine;
 
 namespace GravityGuy.Player
@@ -23,10 +25,6 @@ namespace GravityGuy.Player
         [SerializeField]
         private int rotationSpeed;
         [SerializeField]
-        private float gravity;
-        [SerializeField]
-        private Vector3 velocity;
-        [SerializeField]
         private float turnSmoothTime = 0.1f;
         [SerializeField]
         private float targetAngle;
@@ -34,6 +32,10 @@ namespace GravityGuy.Player
         private float angle;
 
         [Header("Jump")]
+        [SerializeField]
+        private float gravity;
+        [SerializeField]
+        private Vector3 velocity;
         public Transform GroundCheck;
         [SerializeField]
         private LayerMask groundLayer;
@@ -41,9 +43,13 @@ namespace GravityGuy.Player
         private float groundCheckRadius;
         [SerializeField]
         private float jumpHeight;
+        [SerializeField]
+        private bool setGroundGravity;
+        [SerializeField]
+        private bool isGrounded;
 
         [Header("Gravity Change")]
-        public CinemachineFreeLook freeLook;
+
         [SerializeField]
         private Direction currDirection;
         [SerializeField]
@@ -52,9 +58,16 @@ namespace GravityGuy.Player
         private Quaternion targetRotation;
         [SerializeField]
         private float correctionAngle;
+        [SerializeField]
+        private Vector3 gravityDirection;
 
+        [Header("HoloGram Change")]
+        public GameObject Hologram;
+        public Transform HeadPoint;
+        [SerializeField]
+        private Quaternion headRotation;
         float turnSmoothVelocity;
-        bool isGrounded;
+        
 
 
         private void Start()
@@ -62,6 +75,9 @@ namespace GravityGuy.Player
             playerController = GetComponent<CharacterController>();
             horizontal = 0;
             vertical = 0;
+            gravityDirection =- Vector3.up;
+            //ChangeDirection(Direction.Down);
+            
         }
         private void Update()
         {
@@ -70,29 +86,32 @@ namespace GravityGuy.Player
             manualPhysics();
             playerAnimation();
             changeGravity();
+            changeHologram();
         }
 
         private void changeGravity()
         {
-            switch (currDirection)
+            if (setGroundGravity)
             {
-                case Direction.Left:
-                    if (isGrounded && velocity.x < 0) velocity.x = defaultGravity;
-                    else velocity.x += gravity * Time.deltaTime;
-                    break;
-                case Direction.Right:
-                    if (isGrounded && velocity.x < 0) velocity.x = defaultGravity;
-                    else velocity.x += -gravity * Time.deltaTime;
-                    break;
-                case Direction.Up:
-                    if (isGrounded && velocity.x < 0) velocity.x = defaultGravity;
-                    else velocity.y += -gravity * Time.deltaTime;
-                    break;
-                case Direction.Down:
-                    if (isGrounded && velocity.x < 0) velocity.x = defaultGravity;
-                    else velocity.y += gravity * Time.deltaTime;
-                    break;
+                if (isGrounded)
+                {
+                    if ((transform.up == Vector3.up && velocity.y<0 )|| (transform.up == Vector3.down && velocity.y > 0)||
+                        (transform.up == Vector3.forward && velocity.z < 0)|| (transform.up == Vector3.forward && velocity.z > 0)||
+                        (transform.up == Vector3.right && velocity.x < 0)|| (transform.up == Vector3.left && velocity.x > 0))
+                    {
+                        Debug.Log(transform.up + "   " + Vector3.up);
+                        velocity = gravityDirection * -defaultGravity;
+                        setGroundGravity = false;
+                    }
+                    
+                }
+                else
+                {
+                    velocity += gravityDirection * -gravity;
+                }
             }
+            if(!isGrounded ||velocity.magnitude>=10)
+                setGroundGravity = true;
             playerController.Move(velocity * Time.deltaTime);
         }
 
@@ -119,20 +138,15 @@ namespace GravityGuy.Player
             if (Input.GetKey(KeyCode.D)) horizontal = 1f;
             if (Input.GetKey(KeyCode.A)) horizontal = -1f;
             if (Input.GetKeyDown(KeyCode.Space)) jump();
-            if (Input.GetKeyDown(KeyCode.UpArrow)) ChangeDirection(Direction.Up);
-            if (Input.GetKeyDown(KeyCode.DownArrow)) ChangeDirection(Direction.Down);
-            if (Input.GetKeyDown(KeyCode.LeftArrow)) ChangeDirection(Direction.Left);
-            if (Input.GetKeyDown(KeyCode.RightArrow)) ChangeDirection(Direction.Right);
-            if (Input.GetKeyUp(KeyCode.UpArrow)) ChangeDirection(Direction.Up);
-            if (Input.GetKeyUp(KeyCode.DownArrow)) ChangeDirection(Direction.Down);
-            if (Input.GetKeyUp(KeyCode.LeftArrow)) ChangeDirection(Direction.Left);
-            if (Input.GetKeyUp(KeyCode.RightArrow)) ChangeDirection(Direction.Right);
         }
 
         private void jump()
         {
             Playeranimator.SetTrigger("OnAir");
-            velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            float jumpforce = Mathf.Sqrt(jumpHeight * -2f * gravity);
+            Debug.Log(transform.up * jumpforce);
+            velocity = transform.up * jumpforce;
+            playerController.Move(velocity * Time.deltaTime);
         }
 
         private void movement()
@@ -145,7 +159,11 @@ namespace GravityGuy.Player
             {
                 targetAngle = Mathf.Atan2(newpos.x, newpos.z) * Mathf.Rad2Deg + offsetangle;
                 angle = Mathf.SmoothDampAngle(transform.eulerAngles.y, targetAngle, ref turnSmoothVelocity, turnSmoothTime);
-                transform.rotation = Quaternion.Euler(0f, angle, 0f);
+                Debug.Log(transform.rotation.z);
+                if(currDirection == Direction.Left || currDirection==Direction.Right)
+                {
+                    transform.rotation = Quaternion.Euler( angle,0f, transform.rotation.eulerAngles.z);
+                }else transform.rotation = Quaternion.Euler(0f, angle, transform.rotation.eulerAngles.z);
 
                 Vector3 moveDir = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
                 playerController.Move(moveDir.normalized * -speed * Time.deltaTime);
@@ -153,7 +171,7 @@ namespace GravityGuy.Player
             }
             else Playeranimator.SetFloat("speed", 0);
         }
-
+        
         public void ChangeDirection(Direction direction)
         {
             velocity = Vector3.zero;
@@ -161,21 +179,61 @@ namespace GravityGuy.Player
             switch (direction)
             {
                 case Direction.Left:
-                    correctionAngle = -90f;
+                    gravityDirection = Vector3.right;
                     break;
                 case Direction.Right:
-                    correctionAngle = 90f;
+                    gravityDirection = Vector3.left;
                     break;
                 case Direction.Up:
-                    correctionAngle = 180f;
+                    gravityDirection = Vector3.up;
                     break;
                 case Direction.Down:
-                    correctionAngle = 0f;
+                    gravityDirection = Vector3.down;
                     break;
             }
-            targetRotation = Quaternion.Euler(0f, 0f, correctionAngle);
-            transform.rotation = targetRotation;
-            Debug.Log(Camerapos);
+            transform.up = -gravityDirection;
+        }
+
+        private void OnTriggerEnter(Collider other)
+        {
+            Debug.Log(other.name);
+            other.gameObject.GetComponent<ICollectable>()?.OnCollect();
+        }
+        public void changeHologram()
+        {
+            if(HeadPoint.position!=Hologram.transform.position)
+            {
+                Hologram.transform.position = HeadPoint.position;
+                Hologram.transform.rotation = Quaternion.Euler(HeadPoint.rotation.eulerAngles);
+            }
+            
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                headRotation = Quaternion.Euler(Vector3.right * 90f);
+                Hologram.transform.rotation *= headRotation;
+            }
+            if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                headRotation = Quaternion.Euler(Vector3.right * -90f);
+                Hologram.transform.rotation *= headRotation;
+            }
+            if (Input.GetKeyDown(KeyCode.LeftArrow))
+            {
+                headRotation = Quaternion.Euler(Vector3.forward * 90f);
+                Hologram.transform.rotation *= headRotation;
+            }
+            if (Input.GetKeyDown(KeyCode.RightArrow))
+            {
+                headRotation = Quaternion.Euler(Vector3.forward * -90f);
+                Hologram.transform.rotation *= headRotation;
+            }
+            if(Input.GetKeyDown(KeyCode.R))
+            {
+                Debug.Log(Hologram.transform.up);
+                transform.rotation = Quaternion.Euler( Hologram.transform.eulerAngles);
+                gravityDirection = -transform.up;
+            }
+            
         }
     }
     public enum Direction
